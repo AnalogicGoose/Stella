@@ -578,9 +578,11 @@ const tts = new SpeechOutput({ root: ROOT, config: () => config.load(),
 });
 
 function endVoiceSession() {
+  const ended = voiceSession;
   voiceSession = false;
   if (speech.current?.wakeActivated) speech.cancel();
-  if (overlay && !overlay.isDestroyed() && (fullscreenState.active || config.load().gamingMode)) {
+  // Not already ended (entering fullscreen ends it and lets her fold away before the hide).
+  if (ended && overlay && !overlay.isDestroyed() && (fullscreenState.active || config.load().gamingMode)) {
     setOverlayIgnore(true); setOverlayFocusable(false); overlay.hide();
   }
 }
@@ -826,7 +828,9 @@ function onFullscreen(active) {
   const revision = fullscreenState.revision + 1;
   fullscreenState = { active, revision };
   exclusiveGate.onFullscreen(active); // a new game session may hear the borderless suggestion again
-  if (active) { if (!['wake', 'commands'].includes(speech.current?.mode) && !speech.current?.wakeActivated) speech.cancel(); if (!voiceSession) tts.cancel(); }
+  // Going fullscreen ends a conversation that was already open, a "Hey Stella" one too (the video's own audio would
+  // otherwise keep it, and her window, alive). "Hey Stella" said in fullscreen still starts one. The hide below folds her.
+  if (active) { if (!['wake', 'commands'].includes(speech.current?.mode)) speech.cancel(); voiceSession = false; tts.cancel(); }
   clearTimeout(fullscreenHideTimer);
   if (!overlay || overlay.isDestroyed()) return;
   overlay.webContents.setBackgroundThrottling(false);
